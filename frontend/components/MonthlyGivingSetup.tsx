@@ -37,18 +37,18 @@ export default function MonthlyGivingSetup({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Trap focus while the dialog is open and Esc closes it (WCAG 2.4.3).
-  useFocusTrap<HTMLDivElement>({
+  // The containerRef MUST be attached to the dialog wrapper so the hook's
+  // focusable-element query targets the actual modal subtree.
+  const dialogRef = useFocusTrap<HTMLDivElement>({
     active: true,
     onEscape: onClose,
     initialFocusRef: closeButtonRef,
   });
 
-  // Prevent body scroll while the dialog is open and move focus into the
-  // dialog so screen readers announce it.
+  // Prevent body scroll while the dialog is open.
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
     };
@@ -93,6 +93,7 @@ export default function MonthlyGivingSetup({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="monthly-giving-setup-title"

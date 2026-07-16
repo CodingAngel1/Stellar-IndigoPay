@@ -403,7 +403,7 @@ export default function Dashboard({ publicKey, onConnect }: DashboardProps) {
           tabIndex={activeTab === "impact" ? 0 : -1}
           onClick={() => setActiveTab("impact")}
           onKeyDown={(e) => handleTabKeyDown(e, "impact")}
-          className={`px-6 py-3 text-sm font-semibold transition-all border-b-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#818CF8] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0A0A1A] focus:outline-none ${activeTab === "impact" ? "border-[#4F46E5] dark:border-[#818CF8] text-[#0F172A] dark:text-[#E2E8F0]" : "border-transparent text-[#64748B] dark:text-[#94A3B8] hover:text-[#4F46E5] dark:hover:text-[#818CF8]"}`}
+          className={`px-6 py-3 text-sm font-semibold transition-all border-b-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#818CF8] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0A0A1A] ${activeTab === "impact" ? "border-[#4F46E5] dark:border-[#818CF8] text-[#0F172A] dark:text-[#E2E8F0]" : "border-transparent text-[#64748B] dark:text-[#94A3B8] hover:text-[#4F46E5] dark:hover:text-[#818CF8]"}`}
         >
           My Impact
         </button>
@@ -416,7 +416,7 @@ export default function Dashboard({ publicKey, onConnect }: DashboardProps) {
           tabIndex={activeTab === "saved" ? 0 : -1}
           onClick={() => setActiveTab("saved")}
           onKeyDown={(e) => handleTabKeyDown(e, "saved")}
-          className={`px-6 py-3 text-sm font-semibold transition-all border-b-2 flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#818CF8] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0A0A1A] focus:outline-none ${activeTab === "saved" ? "border-[#4F46E5] dark:border-[#818CF8] text-[#0F172A] dark:text-[#E2E8F0]" : "border-transparent text-[#64748B] dark:text-[#94A3B8] hover:text-[#4F46E5] dark:hover:text-[#818CF8]"}`}
+          className={`px-6 py-3 text-sm font-semibold transition-all border-b-2 flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#818CF8] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0A0A1A] ${activeTab === "saved" ? "border-[#4F46E5] dark:border-[#818CF8] text-[#0F172A] dark:text-[#E2E8F0]" : "border-transparent text-[#64748B] dark:text-[#94A3B8] hover:text-[#4F46E5] dark:hover:text-[#818CF8]"}`}
         >
           Saved Projects
           {wishlist.length > 0 && (
