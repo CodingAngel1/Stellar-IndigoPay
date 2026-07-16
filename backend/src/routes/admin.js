@@ -155,4 +155,7 @@ router.get("/audit-log", adminRequired, async (req, res, next) => {
   }
 });
 
+router.use("/queues", require("./admin/queues"));
+router.use("/documents", require("./admin/documents"));
+
 module.exports = router;
