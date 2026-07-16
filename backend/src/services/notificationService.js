@@ -7,50 +7,48 @@ const inAppChannel = require("./channels/inApp");
 const pushChannel = require("./channels/push");
 const emailChannel = require("./channels/email");
 
-const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
-
 async function resolveRecipients({ type, projectId, walletAddress }) {
   switch (type) {
-    case "project_update":
-    case "milestone_reached": {
-      const { rows } = await pool.query(
-        `SELECT DISTINCT dt.wallet_address
-         FROM project_follows pf
-         JOIN device_tokens dt ON pf.device_token_id = dt.id
-         WHERE pf.project_id = $1 AND dt.wallet_address IS NOT NULL AND dt.is_active = true`,
-        [projectId],
-      );
-      const subs = await pool.query(
-        "SELECT email FROM project_subscriptions WHERE project_id = $1",
-        [projectId],
-      );
-      const wallets = rows.map((r) => ({ type: "wallet", address: r.wallet_address }));
-      const emails = subs.rows.map((r) => ({ type: "email", address: r.email }));
-      return [...wallets, ...emails];
-    }
-    case "match_applied": {
-      if (!projectId) return [];
-      const { rows } = await pool.query(
-        "SELECT wallet_address FROM projects WHERE id = $1",
-        [projectId],
-      );
-      if (!rows[0]) return [];
-      return [{ type: "wallet", address: rows[0].wallet_address }];
-    }
-    case "verification_status": {
-      if (!walletAddress) return [];
-      return [{ type: "wallet", address: walletAddress }];
-    }
-    case "monthly_digest": {
-      if (!projectId) return [];
-      const subs = await pool.query(
-        "SELECT email FROM project_subscriptions WHERE project_id = $1",
-        [projectId],
-      );
-      return subs.rows.map((r) => ({ type: "email", address: r.email }));
-    }
-    default:
-      return [];
+  case "project_update":
+  case "milestone_reached": {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT dt.wallet_address
+       FROM project_follows pf
+       JOIN device_tokens dt ON pf.device_token_id = dt.id
+       WHERE pf.project_id = $1 AND dt.wallet_address IS NOT NULL AND dt.is_active = true`,
+      [projectId],
+    );
+    const subs = await pool.query(
+      "SELECT email FROM project_subscriptions WHERE project_id = $1",
+      [projectId],
+    );
+    const wallets = rows.map((r) => ({ type: "wallet", address: r.wallet_address }));
+    const emails = subs.rows.map((r) => ({ type: "email", address: r.email }));
+    return [...wallets, ...emails];
+  }
+  case "match_applied": {
+    if (!projectId) return [];
+    const { rows } = await pool.query(
+      "SELECT wallet_address FROM projects WHERE id = $1",
+      [projectId],
+    );
+    if (!rows[0]) return [];
+    return [{ type: "wallet", address: rows[0].wallet_address }];
+  }
+  case "verification_status": {
+    if (!walletAddress) return [];
+    return [{ type: "wallet", address: walletAddress }];
+  }
+  case "monthly_digest": {
+    if (!projectId) return [];
+    const subs = await pool.query(
+      "SELECT email FROM project_subscriptions WHERE project_id = $1",
+      [projectId],
+    );
+    return subs.rows.map((r) => ({ type: "email", address: r.email }));
+  }
+  default:
+    return [];
   }
 }
 
@@ -123,29 +121,29 @@ async function recordDelivery({
 
 async function sendToChannel(channel, recipient, { title, body, data, projectId, text }) {
   switch (channel) {
-    case "in_app":
-      return inAppChannel.send({
-        recipient: recipient.address,
-        title,
-        body,
-        data,
-      });
-    case "push":
-      return pushChannel.send({
-        recipient: recipient.address,
-        title,
-        body,
-        data: { ...data, projectId },
-      });
-    case "email":
-      return emailChannel.send({
-        recipient: recipient.address,
-        subject: title,
-        html: body,
-        text: text || body.replace(/<[^>]*>/g, ""),
-      });
-    default:
-      return { status: "skipped", error: "unknown_channel" };
+  case "in_app":
+    return inAppChannel.send({
+      recipient: recipient.address,
+      title,
+      body,
+      data,
+    });
+  case "push":
+    return pushChannel.send({
+      recipient: recipient.address,
+      title,
+      body,
+      data: { ...data, projectId },
+    });
+  case "email":
+    return emailChannel.send({
+      recipient: recipient.address,
+      subject: title,
+      html: body,
+      text: text || body.replace(/<[^>]*>/g, ""),
+    });
+  default:
+    return { status: "skipped", error: "unknown_channel" };
   }
 }
 

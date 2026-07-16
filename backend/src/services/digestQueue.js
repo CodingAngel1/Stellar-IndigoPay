@@ -26,9 +26,6 @@ const QUEUE = "monthly-impact-digest";
 // Default: 1st of every month at 08:00 UTC
 const DEFAULT_CRON = "0 8 1 * *";
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
-const FROM_ADDRESS =
-  process.env.EMAIL_FROM || "Stellar-IndigoPay <updates@stellarindigopay.app>";
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
 
 let boss = null;
@@ -142,82 +139,6 @@ function buildDigestText({
     `You're receiving this because you subscribed to ${project.name}.`,
   );
   return lines.join("\n");
-}
-
-// ── Email sender (batched, same Resend convention as email.js) ───────────────
-
-async function sendDigestEmails({
-  project,
-  stats,
-  milestones,
-  updates,
-  emails,
-  monthLabel,
-}) {
-  if (!RESEND_API_KEY) {
-    logger.warn(
-      { event: "digest_skip_no_key", projectId: project.id },
-      "[digestQueue] RESEND_API_KEY not set — skipping",
-    );
-    return;
-  }
-  if (!emails.length) return;
-
-  const projectUrl = `${APP_URL}/projects/${project.id}`;
-  const subject = `Your ${monthLabel} Impact Digest — ${project.name}`;
-  const html = buildDigestHtml({
-    project,
-    stats,
-    milestones,
-    updates,
-    projectUrl,
-    monthLabel,
-  });
-  const text = buildDigestText({
-    project,
-    stats,
-    milestones,
-    updates,
-    projectUrl,
-    monthLabel,
-  });
-
-  const BATCH = 50;
-  for (let i = 0; i < emails.length; i += BATCH) {
-    const batch = emails.slice(i, i + BATCH);
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: FROM_ADDRESS,
-          to: batch,
-          subject,
-          html,
-          text,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        logger.error(
-          {
-            event: "digest_resend_error",
-            projectId: project.id,
-            batch: i / BATCH + 1,
-          },
-          body,
-        );
-      }
-    } catch (err) {
-      logger.error(
-        { event: "digest_fetch_error", projectId: project.id, err },
-        err.message,
-      );
-    }
-  }
 }
 
 // ── Worker logic ─────────────────────────────────────────────────────────────

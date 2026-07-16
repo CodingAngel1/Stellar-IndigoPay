@@ -1,6 +1,5 @@
 "use strict";
 
-const pool = require("../../db/pool");
 const logger = require("../../logger");
 const pushService = require("../pushService");
 
@@ -26,7 +25,7 @@ async function send({ recipient, title, body, data }) {
   }
 }
 
-async function sendToFollowers({ projectId, title, body, data }) {
+async function sendToFollowers({ projectId, title, body: _body, data }) {
   try {
     const result = await pushService.sendProjectUpdateNotifications({
       project: { id: projectId },
