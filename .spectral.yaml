@@ -1,0 +1,25 @@
+# Spectral API linting ruleset for Stellar-IndigoPay
+#
+# Extends the built-in `spectral:oas` ruleset which validates OpenAPI 3.x
+# structure (media examples, schema types, server URLs, path parameters,
+# trailing slashes, operation tags, typed enums, etc.).
+#
+# Project-specific conventions enforced here:
+# - Operation summary is required (not just description)
+#
+# 429-on-mutation-endpoints is enforced separately by a CI safety net
+# (.github/workflows/ci.yml) because Spectral's built-in functions
+# cannot assert on specific child keys within an object.
+#
+extends: "spectral:oas"
+
+rules:
+  # Operation summary is required for documentation generators
+  indigopay-operation-summary:
+    description: Each operation should have a summary
+    severity: error
+    message: "Operation at {{path}} is missing a summary. Add a summary field."
+    given: $.paths.*[get,post,patch,delete,put]
+    then:
+      field: summary
+      function: truthy
