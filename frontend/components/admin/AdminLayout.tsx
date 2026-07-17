@@ -19,6 +19,7 @@ interface AdminLayoutProps {
 const NAV_LINKS = [
   { href: "/admin/verification", label: "Verification Queue" },
   { href: "/admin", label: "Projects" },
+  { href: "/admin/audit", label: "Audit Log" },
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
