@@ -145,13 +145,11 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Generate visual snapshots for Linux
-        working-directory: frontend
-        run: npx playwright test --update-snapshots --grep "Visual regression"
-
       - name: Run Playwright tests
         working-directory: frontend
-        run: npm run test:e2e -- --reporter=html,list
+        # Visual regression snapshots are OS/font-render dependent — skip in CI,
+        # run locally where the baseline images were generated.
+        run: npm run test:e2e -- --reporter=html,list --grep-invert "Visual regression"
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
