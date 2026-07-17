@@ -44,7 +44,12 @@ const logger = require("./logger");
 const requestLogger = require("./middleware/requestLogger");
 const requestId = require("./middleware/requestId");
 const queryRouter = require("./middleware/queryRouter");
+const {
+  apiVersionMiddleware,
+  registerApiVersionDiscoveryRoutes,
+} = require("./middleware/apiVersion");
 const metricsMiddleware = require("./middleware/metrics");
+const { refreshDbPoolMetrics } = require("./services/metrics");
 const {
   createCorsMiddleware,
   getAllowedOrigins,
@@ -58,6 +63,8 @@ const { start: startWebhookQueue,
   stop: stopWebhookQueue,
 } = require("./services/webhookQueue");
 const { start: startPushQueue } = require("./services/pushQueue");
+const { start: startIdempotencyCleanup } = require("./services/idempotencyCleanup");
+const { start: startBlacklistCleanup } = require("./services/blacklistCleanup");
 const { startIndexer } = require("./services/indexerService");
 const { startReconciler, stopReconciler } = require("./services/indexerReconciler");
 const { startDLQWorker, stopDLQWorker } = require("./services/indexerDLQWorker");
@@ -106,8 +113,14 @@ app.use("/", require("./routes/metrics"));
 
 // Health and readiness: liveness 200 if alive, readiness 200 only when every
 // required downstream is reachable. Both fail-fast during graceful shutdown.
+//
+// /health/ready is mounted at a separate path (before helmet/CSRF) so the
+// CI/CD secret-rotation workflow can call it without authentication. It uses
+// the same readiness handler as /api/readyz — both validate every external
+// dependency (Postgres, Redis, Horizon, Soroban RPC).
 app.use("/api/health", require("./routes/health"));
 app.use("/api/readyz", require("./routes/readiness"));
+app.use("/health/ready", require("./routes/readiness"));
 
 // Security headers and body parsing.
 app.use(
@@ -134,6 +147,15 @@ const csrfProtection = csurf({
   },
   ignoreMethods: ["GET", "HEAD", "OPTIONS"],
 });
+// Endpoints whose only credential is the refresh cookie. SameSite=Strict keeps
+// that cookie off every cross-site request, so a CSRF token would cost the
+// admin client a round-trip without closing an attack path. Listed per mount
+// because this router answers on both /api and /api/v1.
+const COOKIE_AUTH_PATHS = ["/admin/refresh", "/admin/logout"].flatMap((path) => [
+  `/api${path}`,
+  `/api/v1${path}`,
+]);
+
 app.use((req, res, next) => {
   // Push-notification endpoints accept cross-origin POSTs from device tokens
   // (mobile apps don't have a CSRF session), so CSRF is skipped there.
@@ -145,6 +167,9 @@ app.use((req, res, next) => {
     req.path.startsWith("/api/notifications") ||
     req.path.startsWith("/api/v1/notifications")
   ) {
+    return next();
+  }
+  if (COOKIE_AUTH_PATHS.includes(req.path)) {
     return next();
   }
   return csrfProtection(req, res, next);
@@ -171,6 +196,11 @@ app.use(redisRateLimiter);
 
 // Per-request HTTP metrics (BEFORE routes so it captures the full request).
 app.use(metricsMiddleware);
+
+// API version negotiation (header/path/query) + deprecation/sunset signaling.
+app.use("/api", apiVersionMiddleware);
+app.use("/api/v1", apiVersionMiddleware);
+registerApiVersionDiscoveryRoutes(app);
 
 // ── Swagger UI (development only) ───────────────────────────────────────────
 if (process.env.NODE_ENV !== "production") {
@@ -391,14 +421,8 @@ async function startServer() {
   await startProfileQueue(io);
   await startWebhookQueue();
   await startPushQueue();
-
-  // idempotency key cleanup cron (pg-boss)
-  await startIdempotencyCleanup().catch((err) => {
-    logger.warn(
-      { event: "idempotency_cleanup_start_failed", err: err.message },
-      "Idempotency cleanup cron could not be started",
-    );
-  });
+  await startIdempotencyCleanup();
+  await startBlacklistCleanup();
 
   // digestQueue is optional in some deployments
   try {
@@ -474,6 +498,7 @@ async function startServer() {
     "./services/webhookQueue",
     "./services/pushQueue",
     "./services/idempotencyCleanup",
+    "./services/blacklistCleanup",
   ]) {
     lifecycle.onShutdown(async () => {
       try {
@@ -521,6 +546,15 @@ async function startServer() {
     } catch {
       // ignore
     }
+  });
+
+  const pool = require("./db/pool");
+  const metricsTimer = setInterval(
+    () => refreshDbPoolMetrics(pool._writerPool),
+    15000,
+  );
+  lifecycle.onShutdown(() => {
+    clearInterval(metricsTimer);
   });
 
   server.listen(PORT, () => {

@@ -6,9 +6,16 @@ const EventEmitter = require("events");
 const express = require("express");
 const router = express.Router();
 const { v4: uuid } = require("uuid");
+const { z } = require("zod");
 const logger = require("../logger");
 const pool = require("../db/pool");
 const { createRateLimiter } = require("../middleware/rateLimiter");
+const { validate } = require("../middleware/validate");
+const {
+  donationSchema,
+  stellarAddress,
+  uuid: uuidValidator,
+} = require("../validators/schemas");
 const { mapDonationRow } = require("../services/store");
 const { enqueueProfileUpdate } = require("../services/profileQueue");
 const { enqueuePushNotification } = require("../services/pushQueue");
@@ -375,7 +382,7 @@ async function recordDonation(req, res, next) {
  * @returns {Promise<void>} Sends the created donation payload.
  * @throws {Error} If rate limiting or donation creation fails.
  */
-router.post("/", donationLimiter, recordDonation);
+router.post("/", donationLimiter, validate(donationSchema), recordDonation);
 
 // GET /api/donations/stream
 router.get("/stream", (req, res) => {
@@ -472,20 +479,22 @@ router.get("/project/:projectId", async (req, res, next) => {
  * @returns {Promise<void>} Sends the donor donation history.
  * @throws {Error} If validation or the donation query fails.
  */
-router.get("/donor/:publicKey", async (req, res, next) => {
-  try {
-    validateKey(req.params.publicKey);
-    const result = await pool.query(
-      `SELECT * FROM donations
+router.get(
+  "/donor/:publicKey",
+  validate(z.object({ publicKey: stellarAddress }), "params"),
+  async (req, res, next) => {
+    try {
+      const result = await pool.query(
+        `SELECT * FROM donations
        WHERE donor_address = $1
        ORDER BY created_at DESC`,
-      [req.params.publicKey],
-    );
-    res.json({ success: true, data: result.rows.map(mapDonationRow) });
-  } catch (e) {
-    next(e);
-  }
-});
+        [req.params.publicKey],
+      );
+      res.json({ success: true, data: result.rows.map(mapDonationRow) });
+    } catch (e) {
+      next(e);
+    }
+  });
 
 // GET /api/donations/:id - single donation fetch endpoint
 router.get("/:id", async (req, res, next) => {
@@ -527,7 +536,6 @@ router.get("/:id", async (req, res, next) => {
       e.status = 404;
       throw e;
     }
-
     const row = result.rows[0];
     const donationData = mapDonationRow(row);
     donationData.projectName = row.project_name;
