@@ -26,6 +26,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "framer-motion": "^11.18.2",
+    "leaflet": "^1.9.4",
     "next": "14.2.3",
     "posthog-js": "^1.404.1",
     "qrcode.react": "^4.2.0",
