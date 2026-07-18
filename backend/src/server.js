@@ -389,6 +389,42 @@ async function startServer() {
   await startWebhookQueue();
   await startPushQueue();
 
+  // Retention worker: a dedicated pg-boss instance schedules the config-driven
+  // data-retention policies. Kept separate from the request queues so a
+  // retention failure can never interfere with donation/delivery processing.
+  try {
+    const PgBoss = require("pg-boss");
+    const { registerRetentionWorker } = require("./services/retentionWorker");
+    const retentionBoss = new PgBoss(
+      process.env.DATABASE_URL ||
+        "postgres://postgres:postgres@localhost:5432/indigopay",
+    );
+    retentionBoss.on("error", (err) =>
+      logger.error(
+        { event: "retention_boss_error", err: err.message },
+        "retention pg-boss error",
+      ),
+    );
+    await retentionBoss.start();
+    await registerRetentionWorker(retentionBoss);
+    lifecycle.onShutdown(async () => {
+      try {
+        await retentionBoss.stop();
+      } catch {
+        // ignore
+      }
+    });
+    logger.info(
+      { event: "retention_worker_started" },
+      "Retention worker scheduled",
+    );
+  } catch (err) {
+    logger.error(
+      { event: "retention_startup_error", err: err.message },
+      "Retention worker could not be started",
+    );
+  }
+
   // digestQueue is optional in some deployments
   try {
     const { start: startDigestQueue } = require("./services/digestQueue");
@@ -441,15 +477,6 @@ async function startServer() {
 
   lifecycle.onShutdown(async () => {
     await stopDLQWorker();
-  });
-
-  // Soroban event service: stop the polling loop and persist the cursor.
-  lifecycle.onShutdown(async () => {
-    try {
-      await stopSorobanEvents();
-    } catch {
-      // Service may already be stopped; swallow.
-    }
   });
 
   // pg-boss queues: each one exposes a `stop()` method that drains in-flight
